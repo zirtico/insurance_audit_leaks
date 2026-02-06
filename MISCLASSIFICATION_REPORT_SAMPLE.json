@@ -1,0 +1,65 @@
+{
+  "summary": {
+    "total_flags": 2,
+    "high_confidence": 2,
+    "medium_confidence": 0,
+    "low_confidence": 0,
+    "total_estimated_impact": 2553.2000000000003,
+    "note": "All flags require manual review before correction"
+  },
+  "flags": [
+    {
+      "employee_name": "Bob Johnson",
+      "job_title": "Delivery Driver",
+      "current": {
+        "code": "8810",
+        "description": "Code 8810",
+        "loss_cost": 0.05
+      },
+      "suspected": {
+        "code": "7380",
+        "description": "Trucking - All Employees & Drivers",
+        "loss_cost": 2.628
+      },
+      "impact": {
+        "rate_differential": 2.5780000000000003,
+        "annual_payroll": 50000,
+        "estimated_premium_impact": 1289.0000000000002
+      },
+      "detection": {
+        "confidence": "HIGH",
+        "keywords": [
+          "driver",
+          "delivery"
+        ],
+        "reasoning": "Job title 'Delivery Driver' contains 'driver, delivery' but is classified as 8810. Suspected: 7380 (Trucking - All Employees & Drivers). Rate differential: $2.578 per $100 payroll."
+      }
+    },
+    {
+      "employee_name": "John Smith",
+      "job_title": "Carpenter",
+      "current": {
+        "code": "8810",
+        "description": "Code 8810",
+        "loss_cost": 0.05
+      },
+      "suspected": {
+        "code": "5403",
+        "description": "Carpentry",
+        "loss_cost": 2.157
+      },
+      "impact": {
+        "rate_differential": 2.107,
+        "annual_payroll": 60000,
+        "estimated_premium_impact": 1264.2
+      },
+      "detection": {
+        "confidence": "HIGH",
+        "keywords": [
+          "carpenter"
+        ],
+        "reasoning": "Job title 'Carpenter' contains 'carpenter' but is classified as 8810. Suspected: 5403 (Carpentry). Rate differential: $2.107 per $100 payroll."
+      }
+    }
+  ]
+}
