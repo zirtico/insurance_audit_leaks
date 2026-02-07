@@ -8,7 +8,7 @@ This is the DETERMINISTIC mod calculator that:
 3. Calculates current (incorrect) mod
 4. Calculates corrected mod
 5. Identifies and quantifies all 20 leak types
-6. Generates recovery report
+6. Generates audit report
 
 NO GUESSING. Only deterministic math and lookup tables.
 """
@@ -154,12 +154,7 @@ class DetectedLeak:
     current_value: float
     corrected_value: float
     dollar_impact: float  # How much this leak costs
-    recovery_probability: float  # 0.0 to 1.0 (how likely carrier accepts)
     evidence: str  # Supporting documentation reference
-    
-    @property
-    def expected_recovery(self) -> float:
-        return self.dollar_impact * self.recovery_probability
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -245,7 +240,6 @@ def preprocess_claims(
                         current_value=claim.incurred_total,
                         corrected_value=era_ratable,
                         dollar_impact=claim.incurred_total - era_ratable,
-                        recovery_probability=0.95,  # ERA is well-established
                         evidence="NCCI Experience Rating Plan Manual Rule 2-E-1"
                     ))
             else:
@@ -264,7 +258,6 @@ def preprocess_claims(
                     current_value=era_ratable,
                     corrected_value=sal_capped,
                     dollar_impact=era_ratable - sal_capped,
-                    recovery_probability=0.99,  # SAL is mandatory
                     evidence=f"State Per Claim Accident Limitation = ${config.sal_per_claim:,.0f}"
                 ))
             
@@ -337,7 +330,6 @@ def adjust_payroll_for_leaks(
                 current_value=exp.payroll,
                 corrected_value=exp.payroll - ot_exclusion,
                 dollar_impact=ot_exclusion,
-                recovery_probability=0.90,
                 evidence="NCCI Basic Manual Rule 2-C-2 - Overtime exclusion"
             ))
         
@@ -353,7 +345,6 @@ def adjust_payroll_for_leaks(
                 current_value=exp.executive_officer_payroll,
                 corrected_value=exec_officer_state_cap,
                 dollar_impact=excess_payroll,
-                recovery_probability=0.99,
                 evidence=f"State maximum weekly payroll = ${exec_officer_state_cap:,.0f}"
             ))
         
@@ -368,7 +359,6 @@ def adjust_payroll_for_leaks(
                 current_value=exp.payroll,
                 corrected_value=exp.payroll - exp.severance_pay,
                 dollar_impact=exp.severance_pay,
-                recovery_probability=0.85,
                 evidence="NCCI Basic Manual Rule 2-B-2-e - Severance pay excluded"
             ))
         
@@ -383,7 +373,6 @@ def adjust_payroll_for_leaks(
                 current_value=exp.payroll,
                 corrected_value=exp.payroll - exp.travel_reimbursements,
                 dollar_impact=exp.travel_reimbursements,
-                recovery_probability=0.80,
                 evidence="NCCI Basic Manual Rule 2-B-2-h - Expense reimbursements excluded"
             ))
         
@@ -398,7 +387,6 @@ def adjust_payroll_for_leaks(
                 current_value=exp.payroll,
                 corrected_value=exp.payroll - exp.subcontractor_payroll,
                 dollar_impact=exp.subcontractor_payroll,
-                recovery_probability=0.75,
                 evidence="Certificates of Insurance on file for subcontractors"
             ))
         
@@ -446,7 +434,6 @@ def detect_claim_leaks(
                 current_value=claim.incurred_total,
                 corrected_value=0.0,  # Needs actual recovery amount from notes
                 dollar_impact=claim.incurred_total * 0.25,  # Conservative estimate
-                recovery_probability=0.70,
                 evidence=f"Claim notes: {claim.claim_notes}"
             ))
         
@@ -461,7 +448,6 @@ def detect_claim_leaks(
                     current_value=claim.reserves_indemnity + claim.reserves_medical,
                     corrected_value=0.0,
                     dollar_impact=claim.reserves_indemnity + claim.reserves_medical,
-                    recovery_probability=0.60,
                     evidence=f"Last payment: {claim.last_payment_date}, No activity for {days_inactive} days"
                 ))
         
@@ -474,7 +460,6 @@ def detect_claim_leaks(
                 current_value=claim.incurred_total,
                 corrected_value=0.0,
                 dollar_impact=claim.incurred_total,
-                recovery_probability=0.95,
                 evidence="NCCI Experience Rating Plan Manual Rule 4-C"
             ))
         
@@ -487,7 +472,6 @@ def detect_claim_leaks(
                 current_value=claim.incurred_total,
                 corrected_value=claim.incurred_total * 0.50,  # Conservative estimate
                 dollar_impact=claim.incurred_total * 0.50,
-                recovery_probability=0.65,
                 evidence=f"Claim notes: {claim.claim_notes}"
             ))
         
@@ -502,7 +486,6 @@ def detect_claim_leaks(
                 current_value=claim.incurred_total * 2,
                 corrected_value=claim.incurred_total,
                 dollar_impact=claim.incurred_total,
-                recovery_probability=0.90,
                 evidence=f"Same date, claimant, and amount"
             ))
         else:
@@ -639,7 +622,6 @@ class AuditReport:
     
     # Recovery summary
     total_leak_impact: float
-    expected_recovery: float
     mod_reduction: float  # Current mod - Corrected mod
     premium_savings: float  # (Mod reduction) × Total manual premium
     
@@ -654,14 +636,12 @@ class AuditReport:
             "premium_savings": round(self.premium_savings, 2),
             "total_leaks_found": len(self.detected_leaks),
             "total_leak_impact": round(self.total_leak_impact, 2),
-            "expected_recovery": round(self.expected_recovery, 2),
             "leaks": [
                 {
                     "type": leak.leak_type.value[1],
                     "description": leak.description,
                     "affected_items": leak.affected_items,
                     "dollar_impact": round(leak.dollar_impact, 2),
-                    "recovery_probability": leak.recovery_probability,
                     "evidence": leak.evidence
                 }
                 for leak in self.detected_leaks
@@ -686,7 +666,7 @@ def run_full_audit(
     4. Detect claim-level leaks
     5. Calculate CURRENT mod (using incorrect data)
     6. Calculate CORRECTED mod (after all fixes)
-    7. Quantify recovery
+    7. Quantify impact
     """
     
     # Load state config
@@ -724,9 +704,8 @@ def run_full_audit(
     # STEP 7: Compile all leaks
     all_leaks = payroll_leaks + claim_processing_leaks + claim_leaks
     
-    # STEP 8: Calculate recovery
+    # STEP 8: Calculate impact
     total_leak_impact = sum(leak.dollar_impact for leak in all_leaks)
-    expected_recovery = sum(leak.expected_recovery for leak in all_leaks)
     mod_reduction = current_mod.experience_mod - corrected_mod.experience_mod
     premium_savings = mod_reduction * policy_info.total_manual_premium
     
@@ -736,7 +715,6 @@ def run_full_audit(
         corrected_mod_calc=corrected_mod,
         detected_leaks=all_leaks,
         total_leak_impact=total_leak_impact,
-        expected_recovery=expected_recovery,
         mod_reduction=mod_reduction,
         premium_savings=premium_savings
     )
