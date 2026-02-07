@@ -111,7 +111,7 @@ class DoclingIngestionEngine:
         audit_log = []
 
         # 1. Try to find the "Total" in the raw text using Regex
-        total_pattern = r"(?:Grand Total|Total Incurred|Report Total)[\\s:$]*([\\d,]+\\.\\d{2})"
+        total_pattern = r"(?:Grand Total|Total Incurred|Report Total)[\s:$]*([\d,]+\.\d{2})"
         matches = re.findall(total_pattern, raw_text, re.IGNORECASE)
 
         doc_claimed_total = 0.0

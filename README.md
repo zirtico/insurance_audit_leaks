@@ -14,3 +14,10 @@ normalization step. The LLM should output structured JSON aligned to:
 
 This keeps the OCR/vision layer deterministic and avoids hallucinated values
 before the engine computes mod impact and premium savings.
+
+### Mapping Guidance File
+
+See `llm_mapping.py` for:
+- Required field groups per document type (loss runs, payroll journals, SUI).
+- Field synonym guidance for fuzzy header matching.
+- Normalized payload schemas that align to the engine.
