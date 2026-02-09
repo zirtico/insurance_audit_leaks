@@ -41,6 +41,7 @@ class Claim:
     reserves_medical: float
     status: str  # "Open", "Closed", "Denied"
     last_payment_date: Optional[date] = None
+    closure_date: Optional[date] = None
     claim_notes: str = ""
     
     @property
@@ -110,6 +111,7 @@ class PolicyInfo:
     total_standard_premium: float
     current_mod: float
     state: str
+    policy_deductible: float = 0.0
     
     @property
     def mod_applied_correctly(self) -> bool:
@@ -410,7 +412,8 @@ def adjust_payroll_for_leaks(
 
 def detect_claim_leaks(
     claims: List[Claim],
-    valuation_date: date
+    valuation_date: date,
+    policy_deductible: float = 0.0
 ) -> List[DetectedLeak]:
     """
     Detect claim-level leaks:
@@ -490,6 +493,30 @@ def detect_claim_leaks(
             ))
         else:
             claim_signatures[signature] = claim.claim_number
+
+        # LEAK 14: Valuation Window Error
+        if claim.closure_date and claim.closure_date < valuation_date and claim.status.lower() == "open":
+            leaks.append(DetectedLeak(
+                leak_type=LeakType.VALUATION_WINDOW,
+                description=f"Claim {claim.claim_number} closed before valuation date but reported open",
+                affected_items=[claim.claim_number],
+                current_value=claim.incurred_total,
+                corrected_value=0.0,
+                dollar_impact=claim.incurred_total,
+                evidence=f"Closure date {claim.closure_date} before valuation {valuation_date}"
+            ))
+
+        # LEAK 16: Deductible Leak
+        if policy_deductible > 0 and claim.incurred_total < policy_deductible:
+            leaks.append(DetectedLeak(
+                leak_type=LeakType.DEDUCTIBLE_LEAK,
+                description=f"Claim {claim.claim_number} below deductible",
+                affected_items=[claim.claim_number],
+                current_value=claim.incurred_total,
+                corrected_value=0.0,
+                dollar_impact=claim.incurred_total,
+                evidence=f"Policy deductible = ${policy_deductible:,.2f}"
+            ))
     
     return leaks
 
@@ -688,13 +715,14 @@ def run_full_audit(
     corrected_processed_claims, claim_processing_leaks = preprocess_claims(raw_claims, config)
     
     # STEP 4: Detect claim-level leaks
-    claim_leaks = detect_claim_leaks(raw_claims, valuation_date)
+    claim_leaks = detect_claim_leaks(raw_claims, valuation_date, policy_info.policy_deductible)
     
     # STEP 5: Remove flagged claims from corrected calculation
     # (e.g., denied claims, duplicates)
     final_claims = [
         c for c in corrected_processed_claims
         if not c.original_claim.is_denied  # Remove denied claims
+        and (policy_info.policy_deductible <= 0 or c.original_claim.incurred_total >= policy_info.policy_deductible)
         # TODO: Add more exclusion logic for duplicates, etc.
     ]
     

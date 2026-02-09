@@ -130,7 +130,7 @@ class DoclingIngestionEngine:
             for col in df.columns:
                 # Flexible matching for Loss Run headers
                 header = str(col).lower()
-                if "incurred" in header or "total" in header or "amount" in header:
+                if "incurred" in header:
                     # Don't sum columns that look like dates or claim numbers
                     if "date" in header or "claim" in header:
                         continue

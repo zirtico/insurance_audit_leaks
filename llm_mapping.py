@@ -28,6 +28,7 @@ class PolicyInfoPayload:
     total_standard_premium: float
     current_mod: float
     state: str  # e.g., "GA"
+    policy_deductible: float = 0.0
 
 
 @dataclass
@@ -59,6 +60,7 @@ class ClaimPayload:
     reserves_medical: float
     status: str  # Open / Closed / Denied
     last_payment_date: Optional[str] = None
+    closure_date: Optional[str] = None
     claim_notes: str = ""
 
 
@@ -83,6 +85,9 @@ class MappingDiagnostics:
     warnings: List[str] = field(default_factory=list)
     totals_match: Optional[bool] = None
     totals_variance: Optional[float] = None
+    row_level_flags: List[str] = field(default_factory=list)
+    llm_used: bool = False
+    llm_model: Optional[str] = None
 
 
 @dataclass
@@ -112,6 +117,9 @@ LOSS_RUN_REQUIRED_FIELDS = {
         "incurred_indemnity",
     ],
     "status": ["status", "injury_code"],
+}
+
+LOSS_RUN_OPTIONAL_FIELDS = {
     "legal_recovery": ["subrogation_amount", "litigated_indicator"],
     "description": ["nature_of_injury", "cause_of_loss", "body_part"],
 }
@@ -146,6 +154,39 @@ FIELD_SYNONYMS = {
     "double_time": ["double time", "2x", "double-time"],
     "regular_pay": ["regular pay", "base pay", "straight time"],
 }
+
+# Note: The LLM should use fuzzy mapping and language understanding first.
+# These synonyms are a seed list for deterministic fallback/validation when headers
+# are abbreviated or inconsistent.
+
+LOSS_RUN_MAPPING_RULES = [
+    "Normalize carrier headers to the ClaimPayload schema regardless of wording or layout.",
+    "If a column represents paid + reserved indemnity, map to incurred_indemnity.",
+    "If a column represents paid + reserved medical, map to incurred_medical.",
+]
+
+STATUS_INFERENCE_RULES = [
+    "If incurred_indemnity == 0 and incurred_medical > 0, set injury_code = '6' (Med-Only).",
+    "Translate carrier status codes to Open/Closed/Denied using the carrier legend.",
+]
+
+ENTITY_RECONCILIATION_RULES = [
+    "Extract global fields (policy number, valuation date, policy period) from headers.",
+    "Inject global fields into each claim payload when required downstream.",
+]
+
+MATH_VALIDATION_RULES = [
+    "paid_medical + reserves_medical must equal incurred_medical (within tolerance).",
+    "paid_indemnity + reserves_indemnity must equal incurred_indemnity (within tolerance).",
+    "If validation fails, flag the row for manual review instead of emitting bad data.",
+]
+
+PAYROLL_MAPPING_RULES = [
+    "Normalize payroll headers to ClassCodeExposurePayload and PayrollRowPayload.",
+    "Extract overtime earnings and rate (time-and-a-half, double time) when present.",
+    "Exclude severance, tips, and reimbursements from ratable payroll.",
+    "Detect officer/owner indicators to apply state officer caps downstream.",
+]
 
 
 def required_fields_for(document_type: str) -> Dict[str, List[str]]:
