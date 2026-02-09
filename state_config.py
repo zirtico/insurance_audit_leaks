@@ -6,7 +6,6 @@ This file contains all state-specific parameters needed for mod calculations.
 Each state has its own configuration class that can be easily swapped.
 
 For NCCI states: Use standard NCCI formulas with state-specific values
-For non-NCCI states (CA, NY, PA, etc.): Override calculation methods as needed
 """
 
 from dataclasses import dataclass
@@ -167,130 +166,11 @@ class GeorgiaConfig(StateConfig):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# CALIFORNIA CONFIGURATION (Non-NCCI - WCIRB)
-# ═══════════════════════════════════════════════════════════════════════════
-
-class CaliforniaConfig(StateConfig):
-    """
-    California uses WCIRB (Workers' Compensation Insurance Rating Bureau)
-    
-    KEY DIFFERENCES FROM NCCI:
-    - Variable split point based on employer size
-    - No ballast (B) - uses "Z" credibility instead
-    - Different W calculation
-    - No 70% ERA discount
-    """
-    
-    def __init__(self):
-        super().__init__(
-            state_code="CA",
-            state_name="California",
-            
-            # CA-specific (these are approximations - need WCIRB docs)
-            split_point=15_000.00,  # Variable by employer
-            sal_per_claim=200_000.00,  # Estimate
-            sal_multiple_claim=400_000.00,
-            g_value=0.0,  # Not used in CA
-            s_value=0.0,  # Not used in CA
-            
-            # ERA Status
-            is_era_state=False,  # CA doesn't use ERA
-            
-            # Bureau Info
-            is_ncci_state=False,
-            bureau_name="WCIRB",
-            
-            # Effective Date (example)
-            effective_date=date(2026, 1, 1),
-            elr_decimals=2,  # CA may still use 2 decimals
-            
-            min_expected_losses=10_000.00  # Different threshold
-        )
-    
-    def calculate_w_and_b(self, expected_losses: float) -> Tuple[float, float]:
-        """
-        California uses a different credibility system.
-        This is a placeholder - needs actual WCIRB formula.
-        """
-        # TODO: Implement WCIRB-specific credibility calculation
-        raise NotImplementedError("California W/B calculation requires WCIRB documentation")
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# NEW YORK CONFIGURATION (Non-NCCI - NYCIRB)
-# ═══════════════════════════════════════════════════════════════════════════
-
-class NewYorkConfig(StateConfig):
-    """
-    New York uses NYCIRB (New York Compensation Insurance Rating Board)
-    
-    KEY DIFFERENCES:
-    - Different split point logic
-    - No 70% ERA discount
-    - Modified primary/excess calculation
-    """
-    
-    def __init__(self):
-        super().__init__(
-            state_code="NY",
-            state_name="New York",
-            
-            # NY-specific
-            split_point=19_500.00,  # Estimate
-            sal_per_claim=180_000.00,  # Estimate
-            sal_multiple_claim=360_000.00,
-            g_value=0.0,  # Not used
-            s_value=0.0,
-            
-            is_era_state=False,
-            is_ncci_state=False,
-            bureau_name="NYCIRB",
-            
-            effective_date=date(2026, 1, 1),
-            elr_decimals=2
-        )
-    
-    def calculate_w_and_b(self, expected_losses: float) -> Tuple[float, float]:
-        """NY-specific W/B calculation"""
-        raise NotImplementedError("New York W/B calculation requires NYCIRB documentation")
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PENNSYLVANIA CONFIGURATION (Non-NCCI - PCRB)
-# ═══════════════════════════════════════════════════════════════════════════
-
-class PennsylvaniaConfig(StateConfig):
-    """Pennsylvania Compensation Rating Bureau (PCRB)"""
-    
-    def __init__(self):
-        super().__init__(
-            state_code="PA",
-            state_name="Pennsylvania",
-            
-            split_point=19_500.00,  # Estimate
-            sal_per_claim=175_000.00,  # Estimate
-            sal_multiple_claim=350_000.00,
-            g_value=0.0,
-            s_value=0.0,
-            
-            is_era_state=False,  # PA has modified med-only reduction
-            is_ncci_state=False,
-            bureau_name="PCRB",
-            
-            effective_date=date(2026, 1, 1),
-            elr_decimals=2
-        )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # STATE FACTORY (Loads correct config based on state code)
 # ═══════════════════════════════════════════════════════════════════════════
 
 STATE_CONFIGS = {
     "GA": GeorgiaConfig,
-    "CA": CaliforniaConfig,
-    "NY": NewYorkConfig,
-    "PA": PennsylvaniaConfig,
 }
 
 def get_state_config(state_code: str) -> StateConfig:
